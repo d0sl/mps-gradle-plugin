@@ -1,0 +1,99 @@
+configurations {
+    mps {
+        description = 'Dependencies to add to MPS'
+        visible = false
+    }
+}
+
+task mps_compose(description: 'Imports tasks from MPS ant script.',
+        group: 'd0sl') {
+    doLast {
+        Configuration lib = configurations.getByName('mps')
+        String solution = 'external'
+        if(project.hasProperty('mpsConfiguration')) {
+            lib = getProperty('mpsConfiguration')
+        }
+        if(project.hasProperty('mpsSolutionName')) {
+            solution = getProperty('mpsSolutionName')
+        }
+        buildMPSLib(lib, solution)
+    }
+}
+
+void buildMPSLib(Configuration lib, String solution) {
+    logging.captureStandardOutput LogLevel.QUIET
+    def artifacts = lib.resolvedConfiguration.resolvedArtifacts
+    def solutionFolder = 'solutions/' + solution
+    def libFolder = solutionFolder + '/lib'
+
+    // clear destination lib folder
+    logger.quiet('Clearing ' + libFolder + ' folder')
+    delete(files(libFolder))
+
+    // copying artifacts
+    logger.quiet('Copying ' + artifacts.size() + ' files from ' + lib.name + ' ' + libFolder)
+    copy {
+        from lib.files
+        into libFolder
+    }
+
+    logger.quiet('Reading the solution file.')
+    def xmlFile = file solutionFolder + '/' + solution + '.msd'
+    if (!xmlFile.exists()) {
+        throw new GradleException("Required solution file does not exist: $xmlFile.canonicalPath")
+    }
+
+    def xml = new XmlParser().parse(xmlFile)
+    logger.quiet("solution name: ${xml.@name}")
+
+    // clearing modelRoot && stubModelEntry
+    def nodesToDel = xml.models.modelRoot.findAll { true }
+    nodesToDel.each {
+        logger.quiet('  -> removing modelRoot' + it.@contentPath)
+        def parent = it.parent()
+        parent.remove(it)
+    }
+    nodesToDel = xml.stubModelEntries.stubModelEntry.findAll { true }
+    nodesToDel.each {
+        logger.quiet('  -> removing stubModelEntry' + it.@path)
+        def parent = it.parent()
+        parent.remove(it)
+    }
+
+    artifacts.each {
+        logger.quiet('Performing ' + it.id)
+        String artifactName = it.name
+        String fileName = it.name + '-' + it.moduleVersion.id.version + '.' + it.extension
+
+        // adding artifact modelRoot && stubModelEntry
+        logger.quiet('  -> adding modelRoot ' + '${module}/lib/' + fileName + '!')
+        String contentPath = '${module}/lib/' + fileName + '!'
+        Node models = (Node) xml.models.find { true }
+        Node n = new Node(models,
+                'modelRoot',
+                [contentPath: contentPath, type: 'java_classes'])
+        new Node(n,
+                'sourceRoot',
+                [location: '.'])
+        logger.quiet('  -> adding stubModelEntry ' + '${module}/lib/' + fileName)
+        String path = '${module}/lib/' + fileName
+        Node stubModelEntries = (Node) xml.stubModelEntries.find { true }
+        new Node(stubModelEntries,
+                'stubModelEntry',
+                [path: path])
+    }
+
+    new File(solutionFolder + '/' + solution + '.msd').withWriter {
+        def printer = new XmlNodePrinter(new PrintWriter(it))
+        printer.preserveWhitespace = true
+        printer.print(xml)
+    }
+}
+
+if(project.hasProperty('antScript'))  {
+    def script = project.property('antScript')
+    ant.importBuild(script) { antTargetName ->
+        'mps_' + antTargetName
+    }
+}
+
