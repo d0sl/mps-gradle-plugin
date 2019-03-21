@@ -45,6 +45,12 @@ void buildMPSLib(Configuration lib, String solution) {
 
     def xml = new XmlParser().parse(xmlFile)
     logger.quiet("solution name: ${xml.@name}")
+    Node stubModelEntries = (Node) xml.stubModelEntries.find { true }
+    println stubModelEntries
+    if(stubModelEntries == null) {
+        logger.quiet('Create stubModelEntries')
+        stubModelEntries = new Node(xml, 'stubModelEntries')
+    }
 
     // clearing modelRoot && stubModelEntry
     def nodesToDel = xml.models.modelRoot.findAll { true }
@@ -77,7 +83,6 @@ void buildMPSLib(Configuration lib, String solution) {
                 [location: '.'])
         logger.quiet('  -> adding stubModelEntry ' + '${module}/lib/' + fileName)
         String path = '${module}/lib/' + fileName
-        Node stubModelEntries = (Node) xml.stubModelEntries.find { true }
         new Node(stubModelEntries,
                 'stubModelEntry',
                 [path: path])
