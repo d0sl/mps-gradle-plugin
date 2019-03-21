@@ -5,7 +5,7 @@ configurations {
     }
 }
 
-task mps_compose(description: 'Imports tasks from MPS ant script.',
+task mps_compose(description: 'Copies jar-files from selected configuration to MPS solution.',
         group: 'd0sl') {
     doLast {
         Configuration lib = configurations.getByName('mps')
