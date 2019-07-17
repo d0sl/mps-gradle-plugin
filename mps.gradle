@@ -11,7 +11,7 @@ task mps_compose(description: 'Copies jar-files from selected configuration to M
         Configuration lib = configurations.getByName('mps')
         String solution = 'external'
         if(project.hasProperty('mpsConfiguration')) {
-            lib = getProperty('mpsConfiguration')
+            lib = configurations.getByName(getProperty('mpsConfiguration'))
         }
         if(project.hasProperty('mpsSolutionName')) {
             solution = getProperty('mpsSolutionName')
